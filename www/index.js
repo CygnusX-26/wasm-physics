@@ -1,7 +1,7 @@
 import { World } from "wasm-physics";
 import { memory } from "wasm-physics/wasm_physics_bg.wasm";
 
-const world = World.new(500, 500, 150);
+const world = World.new(700, 700, 300);
 const width = world.width();
 const height = world.height();
 const numBoids = world.render_xy_len();
@@ -20,6 +20,17 @@ const renderLoop = () => {
     requestAnimationFrame(renderLoop);
 };
 
+canvas.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+    const x = cssX * (canvas.width / rect.width);
+    const y = cssY * (canvas.height / rect.height);
+
+    world.set_predator_loc(x, y);
+});
+
 const drawBoids = () => {
     const boidsPtr = world.render_xy_ptr();
     const boids = new Float32Array(memory.buffer, boidsPtr, numBoids);
@@ -28,7 +39,7 @@ const drawBoids = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     for (let i = 0; i < numBoids / 2; i++) {
-        ctx.fillRect(boids[i * 2], boids[i * 2 + 1], 2, 2);
+        ctx.fillRect(boids[i * 2], boids[i * 2 + 1], 4, 4);
     }
 };
 
