@@ -3,14 +3,27 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use crate::utils::utils::Utils;
 
 #[derive(Clone)]
-pub struct Boid {
+struct Boid {
     x: f32,
     y: f32,
     vx: f32,
     vy: f32,
 }
 
-pub struct Predator {
+struct WorldParams {
+    pub avoid_factor: f32,
+    pub visible_range: f32,
+    pub matching_factor: f32,
+    pub turn_factor: f32,
+    pub max_speed: f32,
+    pub min_speed: f32,
+    pub centering_factor: f32,
+    pub protected_range: f32,
+    pub predator_turn_factor: f32,
+    pub predator_range: f32,
+}
+
+struct Predator {
     x: f32,
     y: f32,
 }
@@ -22,6 +35,7 @@ pub struct World {
     boids: Vec<Boid>,
     render_xy: Vec<f32>,
     predator: Option<Predator>,
+    params: WorldParams,
 }
 
 impl Predator {
@@ -31,23 +45,12 @@ impl Predator {
 }
 
 impl Boid {
-    const AVOID_FACTOR: f32 = 0.09;
-    const VISIBLE_RANGE: f32 = 30.0;
-    const MATCHING_FACTOR: f32 = 0.04;
-    const TURN_FACTOR: f32 = 0.05;
-    const MAX_SPEED: f32 = 10.0;
-    const MIN_SPEED: f32 = 1.0;
-    const CENTERING_FACTOR: f32 = 0.00045;
-    const PROTECTED_RANGE: f32 = 10.0;
-    const MARGIN: f32 = 75.0;
-    const PREDATOR_TURN_FACTOR: f32 = 0.3;
-    const PREDATOR_RANGE: f32 = 45.0;
     fn new(x: f32, y: f32) -> Self {
         Self {
             x,
             y,
-            vx: (Utils::random_f32() - 0.5) * 20.0,
-            vy: (Utils::random_f32() - 0.5) * 20.0,
+            vx: (Utils::js_random_f32() - 0.5) * 20.0,
+            vy: (Utils::js_random_f32() - 0.5) * 20.0,
         }
     }
 
@@ -57,6 +60,7 @@ impl Boid {
         width: f32,
         height: f32,
         predator: &Option<Predator>,
+        params: &WorldParams,
     ) {
         let mut close_dx = 0.0;
         let mut close_dy = 0.0;
@@ -75,12 +79,12 @@ impl Boid {
                 continue;
             }
 
-            if dx.abs() < Boid::VISIBLE_RANGE && dy.abs() < Boid::VISIBLE_RANGE {
+            if dx.abs() < params.visible_range && dy.abs() < params.visible_range {
                 let squared_distance = dx * dx + dy * dy;
-                if squared_distance < Boid::PROTECTED_RANGE * Boid::PROTECTED_RANGE {
+                if squared_distance < params.protected_range.powi(2) {
                     close_dx += dx;
                     close_dy += dy;
-                } else if squared_distance < Boid::VISIBLE_RANGE * Boid::VISIBLE_RANGE {
+                } else if squared_distance < params.visible_range.powi(2) {
                     xvel_avg += boid.vx;
                     yvel_avg += boid.vy;
                     xpos_avg += boid.x;
@@ -94,10 +98,10 @@ impl Boid {
             let dx = self.x - predator.x;
             let dy = self.y - predator.y;
 
-            if dx.abs() < Boid::PREDATOR_RANGE && dy.abs() < Boid::PREDATOR_RANGE {
+            if dx.abs() < params.predator_range && dy.abs() < params.predator_range {
                 let squared_distance = dx * dx + dy * dy;
 
-                if squared_distance < Boid::PREDATOR_RANGE * Boid::PREDATOR_RANGE {
+                if squared_distance < params.predator_range.powi(2) {
                     predator_dx += dx;
                     predator_dy += dy;
                     num_predators += 1;
@@ -107,16 +111,16 @@ impl Boid {
 
         if num_predators > 0 {
             if predator_dy > 0.0 {
-                self.vy += Boid::PREDATOR_TURN_FACTOR;
+                self.vy += params.predator_turn_factor;
             }
             if predator_dy < 0.0 {
-                self.vy -= Boid::PREDATOR_TURN_FACTOR;
+                self.vy -= params.predator_turn_factor;
             }
             if predator_dx > 0.0 {
-                self.vx += Boid::PREDATOR_TURN_FACTOR;
+                self.vx += params.predator_turn_factor;
             }
             if predator_dx < 0.0 {
-                self.vx -= Boid::PREDATOR_TURN_FACTOR;
+                self.vx -= params.predator_turn_factor;
             }
         }
 
@@ -125,37 +129,39 @@ impl Boid {
             yvel_avg = yvel_avg / neighboring_boids as f32;
             xpos_avg = xpos_avg / neighboring_boids as f32;
             ypos_avg = ypos_avg / neighboring_boids as f32;
-            self.vx += (xvel_avg - self.vx) * Boid::MATCHING_FACTOR;
-            self.vy += (yvel_avg - self.vy) * Boid::MATCHING_FACTOR;
-            self.vx += (xpos_avg - self.x) * Boid::CENTERING_FACTOR;
-            self.vy += (ypos_avg - self.y) * Boid::CENTERING_FACTOR;
+            self.vx += (xvel_avg - self.vx) * params.matching_factor;
+            self.vy += (yvel_avg - self.vy) * params.matching_factor;
+            self.vx += (xpos_avg - self.x) * params.centering_factor;
+            self.vy += (ypos_avg - self.y) * params.centering_factor;
         }
 
-        if self.x < 0.0 + Boid::MARGIN {
-            self.vx += Boid::TURN_FACTOR;
+        let margin_x = width * 0.15;
+        let margin_y = height * 0.15;
+        if self.x < 0.0 + margin_x {
+            self.vx += params.turn_factor;
         }
 
-        if self.y < 0.0 + Boid::MARGIN {
-            self.vy += Boid::TURN_FACTOR;
+        if self.y < 0.0 + margin_y {
+            self.vy += params.turn_factor;
         }
 
-        if self.x > width - Boid::MARGIN {
-            self.vx -= Boid::TURN_FACTOR;
+        if self.x > width - margin_x {
+            self.vx -= params.turn_factor;
         }
 
-        if self.y > height - Boid::MARGIN {
-            self.vy -= Boid::TURN_FACTOR;
+        if self.y > height - margin_y {
+            self.vy -= params.turn_factor;
         }
 
-        self.vx += close_dx * Boid::AVOID_FACTOR;
-        self.vy += close_dy * Boid::AVOID_FACTOR;
+        self.vx += close_dx * params.avoid_factor;
+        self.vy += close_dy * params.avoid_factor;
         let speed = (self.vx.powi(2) + self.vy.powi(2)).sqrt();
-        if speed > Boid::MAX_SPEED {
-            self.vx = (self.vx / speed) * Boid::MAX_SPEED;
-            self.vy = (self.vy / speed) * Boid::MAX_SPEED;
-        } else if speed < Boid::MIN_SPEED {
-            self.vx = (self.vx / speed) * Boid::MIN_SPEED;
-            self.vy = (self.vy / speed) * Boid::MIN_SPEED;
+        if speed > params.max_speed {
+            self.vx = (self.vx / speed) * params.max_speed;
+            self.vy = (self.vy / speed) * params.max_speed;
+        } else if speed < params.min_speed {
+            self.vx = (self.vx / speed) * params.min_speed;
+            self.vy = (self.vy / speed) * params.min_speed;
         }
 
         self.x += self.vx;
@@ -165,12 +171,26 @@ impl Boid {
 
 #[wasm_bindgen]
 impl World {
-    pub fn new(width: u32, height: u32, num_boids: u32) -> Self {
+    pub fn new(
+        width: u32,
+        height: u32,
+        num_boids: u32,
+        avoid_factor: f32,
+        visible_range: f32,
+        matching_factor: f32,
+        turn_factor: f32,
+        min_speed: f32,
+        max_speed: f32,
+        centering_factor: f32,
+        protected_range: f32,
+        predator_turn_factor: f32,
+        predator_range: f32,
+    ) -> Self {
         let boids = (0..num_boids)
             .map(|_| {
                 Boid::new(
-                    Utils::random_f32() * width as f32,
-                    Utils::random_f32() * height as f32,
+                    Utils::js_random_f32() * width as f32,
+                    Utils::js_random_f32() * height as f32,
                 )
             })
             .collect();
@@ -180,6 +200,18 @@ impl World {
             boids,
             render_xy: vec![0.0; (num_boids * 2) as usize],
             predator: None,
+            params: WorldParams {
+                avoid_factor,
+                visible_range,
+                matching_factor,
+                turn_factor,
+                max_speed,
+                min_speed,
+                centering_factor,
+                protected_range,
+                predator_turn_factor,
+                predator_range,
+            },
         }
     }
     pub fn tick(&mut self) {
@@ -191,6 +223,7 @@ impl World {
                 self.width as f32,
                 self.height as f32,
                 &self.predator,
+                &self.params,
             );
         }
 
@@ -223,5 +256,15 @@ impl World {
         } else {
             self.predator = Some(Predator::new(x, y));
         }
+    }
+
+    pub fn update_avoid_factor(&mut self, avoid_factor: f32) {
+        self.params.avoid_factor = avoid_factor;
+    }
+    pub fn update_centering_factor(&mut self, centering_factor: f32) {
+        self.params.centering_factor = centering_factor;
+    }
+    pub fn update_protected_range(&mut self, protected_range: f32) {
+        self.params.protected_range = protected_range;
     }
 }

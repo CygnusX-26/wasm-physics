@@ -9,6 +9,39 @@
             >This page contains webassembly and javascript content, please
             enable javascript in your browser.</noscript
         >
+        <div id="controls">
+            <label> Avoid Factor: <span id="avoid-factor-value"></span></label>
+            <input
+                id="avoid-factor"
+                type="range"
+                min="0"
+                max="10"
+                step="1"
+                value="5"
+            />
+            <label>
+                Centering Factor: <span id="centering-factor-value"></span
+            ></label>
+            <input
+                id="centering-factor"
+                type="range"
+                min="0"
+                max="10"
+                step="1"
+                value="5"
+            />
+            <label>
+                Protected Range: <span id="protected-range-value"></span
+            ></label>
+            <input
+                id="protected-range"
+                type="range"
+                min="0"
+                max="10"
+                step="1"
+                value="5"
+            />
+        </div>
         <canvas id="boid-canvas"></canvas>
         <script src="./bootstrap.js"></script>
     </body>
@@ -23,6 +56,11 @@
 
         canvas {
             border: 1px solid #444;
+        }
+
+        #controls {
+            display: flex;
+            flex-direction: column;
         }
     </style>
 </html>
